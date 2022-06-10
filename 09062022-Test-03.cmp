@@ -1,0 +1,84 @@
+cmpAwesome = {}
+cmpAwesome.description = "Something, something, darkside"
+cmpAwesome.params = {
+	--Define Parameters and Their Values
+	{"Points", "string", "J1A001 J1B001"},
+	{"Voltage Type (DC/AC)", "string", "DC"},
+	{"DW Voltage (V)", "number", 50},
+	{"DW Current (A)", "number", 0.0015},
+	{"DC Duration (s)", "number", 0.01},
+	{"IR Voltage (V)", "number", 50},
+	{"IR Insulres (ohm)", "number", 5000000},
+	{"Time Good For (s)", "number", 0.002},
+	{"Soak Time (s)", "number", 0.002},
+	{"Soak Until Good (0/1)", "number", 0}
+}
+
+function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
+	--Manual Start
+	local iStart
+	iStart = MessageBox("Proceed?", "Why Not!", "Hell No.")
+	if iStart == 2 then
+		iHint = DialogOpen("You Can Abort the Test Now.")
+		--Pause for 0.5 Second
+		Delay(.5)
+		DialogClose(iHint)
+		--Pause for 0.5 Second
+		Delay(.5)
+		return 1, "Aborted :("
+	end
+	
+	--Display Warning Sign During Initial HV Test
+	local iWarn = DialogOpen("Warning: High Voltage!!!")
+	
+	--Define Local Parameters and Run Initial HV Test
+	local iResult, fResMeasured = HipotNetsTiedToPoints(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)    --Lua Manual Page 102
+		
+	--Define the Rest of the Parameters
+	local i = 1    --Set Index Initial Value
+	local sError    --Set Error Message
+	local sSettings    --Set Setting Message
+	local fV_Max, fV_Min, fV, iR, fM    --Set Parameters for Binary Search
+	
+	sSettings = format("Connection Points: %s\n\nSettings:\nDW Voltage: %.2fV\nDW Current %.3fmA\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\n", sPoints, fDWVoltage, fDWCurrent * 1000, fIRVoltage, fIRInsulRes / 1000000)
+	
+	if iResult == 1 then
+		sError = format("\nError: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.3fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
+	elseif iResult == 2 then
+		sError = "\nError: Overcurrent."
+	elseif iResult == 3 then
+		--Set Parameters Initial Values
+		fV_Max = fDWVoltage
+		fV_Min = 50
+		fV = fDWVoltage
+		
+		--Here, the Limit of i is a Preset Value for Minimum Gap Between the Exact Value and the Tested Current Value, 2 ^ 11 = 2048 > 2000
+		while (2 ^ i <= fDWVoltage - 50) do
+			--Conduct HV Test to the Cable in Each Loop
+			iR, fM = HipotNetsTiedToPoints(sPoints, fVoltageType, fV, fDWCurrent, fDCDuration, fV, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
+			if iR == 0 then
+				fV = fV + (fV_Max - fV_Min) / (2 ^ i)    --The Current Value is Larger Than the Exact Value
+			elseif iR == 3 then
+				fV = fV - (fV_Max - fV_Min) / (2 ^ i)    --The Current Value is Smaller Than the Exact Value
+			end
+			i = i + 1
+		end
+		
+		sError = format("\nError: Dielectric Failure.\nMaximum Voltage Allowed: %.2fV", fV)
+	elseif iResult ~= 0 then
+		sError = format("\nUnexpected Error #%i", iResult)
+	end
+	
+	DialogClose(iWarn)
+	
+	--Print the Exact Error
+	if iResult == 0 then
+		--Passed HV Test
+		MessageBox("Successful!\n" .. sSettings)
+		return iResult, sPoints .. " Successful!"
+	else
+		--Failed HV Test
+		MessageBox("Failed.\n" .. sSettings .. sError)
+		return iResult, sPoints .. " Failed." .. sError
+	end
+end
