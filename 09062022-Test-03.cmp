@@ -17,7 +17,7 @@ cmpAwesome.params = {
 function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
 	--Manual Start
 	local iStart
-	iStart = MessageBox("Proceed?", "Why Not!", "Hell No.")
+	iStart = MessageBox("Proceed with " .. sPoints .. "?", "Why Not!", "Hell No.")
 	if iStart == 2 then
 		iHint = DialogOpen("You Can Abort the Test Now.")
 		--Pause for 0.5 Second
@@ -40,7 +40,7 @@ function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDurat
 	local sSettings    --Set Setting Message
 	local fV_Max, fV_Min, fV, iR, fM    --Set Parameters for Binary Search
 	
-	sSettings = format("Connection Points: %s\n\nSettings:\nDW Voltage: %.2fV\nDW Current %.3fmA\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\n", sPoints, fDWVoltage, fDWCurrent * 1000, fIRVoltage, fIRInsulRes / 1000000)
+	sSettings = format("Connection Points: %s\n\nSettings:\nDW Voltage: %.2fV\nDW Current %.3fmA\nDW Duration: %.3fs\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\nIR Duration: %.3fs\n", sPoints, fDWVoltage, fDWCurrent * 1000, fDCDuration, fIRVoltage, fIRInsulRes / 1000000, fTimeGoodFor)
 	
 	if iResult == 1 then
 		sError = format("\nError: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.3fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
