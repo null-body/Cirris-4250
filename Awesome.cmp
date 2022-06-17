@@ -3,7 +3,7 @@ cmpAwesome.description = "Something, something, darkside"
 cmpAwesome.params = {
 	--Define Parameters and Their Values
 	{"Points", "string", "J1A001 J1B001"},
-	{"Voltage Type (DC/AC)", "string", "DC"},
+	{"Voltage Type (DC/AC)", "string", "DC/AC"},
 	{"DW Voltage (V)", "number", 50},
 	{"DW Current (A)", "number", 0.0015},
 	{"DC Duration (s)", "number", 0.01},
@@ -15,18 +15,37 @@ cmpAwesome.params = {
 }
 
 function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
-	--Manual Start
-	local iStart
-	iStart = MessageBox("Proceed with " .. sPoints .. "?", "Why Not!", "Hell No.")
-	if iStart == 2 then
-		iHint = DialogOpen("You Can Abort the Test Now.")
-		--Pause for 0.5 Second
-		Delay(.5)
-		DialogClose(iHint)
-		--Pause for 0.5 Second
-		Delay(.5)
-		return 1, "Aborted :("
-	end
+	--Check for Retest
+	indxfile = io.open('external index file path', 'rb')    --Open external index file
+	local indx = tonumber(indxfile:read('*all'))
+	indxfile:close()
+	indxfile = io.open('external index file path', 'w')    --Open external index file
+	if indx == 3 then
+		iStart = MessageBox("Retest?", "Why Not!", "Hell No.")
+		if iStart == 2 then
+			indxfile:write("0")
+			indxfile:close()
+			local iHint = DialogOpen("You Can Abort the Test Now.")
+			--Pause for 0.5 Second
+			Delay(.5)
+			DialogClose(iHint)
+			--Pause for 0.5 Second
+			Delay(1)
+			return 0, "Aborted :("
+		else
+			indxfile:write("1")
+			indxfile:close()
+		end
+	else
+		indx = indx + 1
+		indxfile:write(indx)
+		indxfile:close()
+	end	
+	
+	--Indicate the test is starting
+	iTest = DialogOpen("Testing " .. sPoints)
+	Delay(1)
+	DialogClose(iTest)
 	
 	--Display Warning Sign During Initial HV Test
 	local iWarn = DialogOpen("Warning: High Voltage!!!")
@@ -40,12 +59,12 @@ function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDurat
 	local sSettings    --Set Setting Message
 	local fV_Max, fV_Min, fV, iR, fM    --Set Parameters for Binary Search
 	
-	sSettings = format("Connection Points: %s\n\nSettings:\nDW Voltage: %.2fV\nDW Current %.3fmA\nDW Duration: %.3fs\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\nIR Duration: %.3fs\n", sPoints, fDWVoltage, fDWCurrent * 1000, fDCDuration, fIRVoltage, fIRInsulRes / 1000000, fTimeGoodFor)
+	sSettings = format("\nSettings:\nDW Voltage: %.2fV\nDW Current %.3fmA\nDW Duration: %.3fs\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\nIR Duration: %.3fs\n", fDWVoltage, fDWCurrent * 1000, fDCDuration, fIRVoltage, fIRInsulRes / 1000000, fTimeGoodFor)
 	
 	if iResult == 1 then
-		sError = format("\nError: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.3fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
+		sError = format("Error: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.3fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
 	elseif iResult == 2 then
-		sError = "\nError: Overcurrent."
+		sError = "Error: Overcurrent."
 	elseif iResult == 3 then
 		--Set Parameters Initial Values
 		fV_Max = fDWVoltage
@@ -64,21 +83,31 @@ function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDurat
 			i = i + 1
 		end
 		
-		sError = format("\nError: Dielectric Failure.\nMaximum Voltage Allowed: %.2fV", fV)
+		sError = format("Error: Dielectric Failure.\nMaximum Voltage Allowed: %.2fV", fV)
 	elseif iResult ~= 0 then
-		sError = format("\nUnexpected Error #%i", iResult)
+		sError = format("Unexpected Error #%i", iResult)
 	end
 	
 	DialogClose(iWarn)
-	
+		
 	--Print the Exact Error
 	if iResult == 0 then
 		--Passed HV Test
-		MessageBox("Successful!\n" .. sSettings)
+		iRes = DialogOpen("Successful!")
+		Delay(1)
+		DialogClose(iRes)
+		file = io.open('report file path', 'a')    --Open report file
+		file:write(sPoints .. " Successful!\n" .. os.date() .. sSettings .. "\n\n")
+		file:close()
 		return iResult, sPoints .. " Successful!"
 	else
 		--Failed HV Test
-		MessageBox("Failed.\n" .. sSettings .. sError)
-		return iResult, sPoints .. " Failed." .. sError
+		iRes = DialogOpen("Failed.\n\n" .. sError)
+		Delay(2)
+		DialogClose(iRes)
+		file = io.open('report file path', 'a')    --Open report file
+		file:write(sPoints .. " Failed.\n" .. os.date() .. "\n" .. sError .. sSettings .. "\n\n")
+		file:close()
+		return iResult, sPoints .. " Failed. " .. sError
 	end
 end
