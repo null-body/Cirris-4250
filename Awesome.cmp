@@ -16,11 +16,11 @@ cmpAwesome.params = {
 
 function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
 	--Check for Retest
-	indxfile = io.open('external index file path', 'rb')    --Open external index file
+	indxfile = io.open('C:\\Cirris\\Index.txt', 'rb')    --Open external index file
 	local indx = tonumber(indxfile:read('*all'))
 	indxfile:close()
-	indxfile = io.open('external index file path', 'w')    --Open external index file
-	if indx == 3 then
+	indxfile = io.open('C:\\Cirris\\Index.txt', 'w')    --Open external index file
+	if indx == 2 then
 		iStart = MessageBox("Retest?", "Why Not!", "Hell No.")
 		if iStart == 2 then
 			indxfile:write("0")
@@ -59,10 +59,10 @@ function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDurat
 	local sSettings    --Set Setting Message
 	local fV_Max, fV_Min, fV, iR, fM    --Set Parameters for Binary Search
 	
-	sSettings = format("\nSettings:\nDW Voltage: %.2fV\nDW Current %.3fmA\nDW Duration: %.3fs\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\nIR Duration: %.3fs\n", fDWVoltage, fDWCurrent * 1000, fDCDuration, fIRVoltage, fIRInsulRes / 1000000, fTimeGoodFor)
+	sSettings = format("\nSettings:\nDW Voltage: %.2fV\nDW Current %.2fmA\nDW Duration: %.3fs\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\nIR Duration: %.3fs\n", fDWVoltage, fDWCurrent * 1000, fDCDuration, fIRVoltage, fIRInsulRes / 1000000, fTimeGoodFor)
 	
 	if iResult == 1 then
-		sError = format("Error: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.3fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
+		sError = format("Error: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.2fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
 	elseif iResult == 2 then
 		sError = "Error: Overcurrent."
 	elseif iResult == 3 then
@@ -96,7 +96,7 @@ function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDurat
 		iRes = DialogOpen("Successful!")
 		Delay(1)
 		DialogClose(iRes)
-		file = io.open('report file path', 'a')    --Open report file
+		file = io.open('C:\\Cirris\\Report\\Report.txt', 'a')    --Open report file
 		file:write(sPoints .. " Successful!\n" .. os.date() .. sSettings .. "\n\n")
 		file:close()
 		return iResult, sPoints .. " Successful!"
@@ -105,7 +105,7 @@ function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDurat
 		iRes = DialogOpen("Failed.\n\n" .. sError)
 		Delay(2)
 		DialogClose(iRes)
-		file = io.open('report file path', 'a')    --Open report file
+		file = io.open('C:\\Cirris\\Report\\Report.txt', 'a')    --Open report file
 		file:write(sPoints .. " Failed.\n" .. os.date() .. "\n" .. sError .. sSettings .. "\n\n")
 		file:close()
 		return iResult, sPoints .. " Failed. " .. sError
