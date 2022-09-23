@@ -1,113 +1,116 @@
-cmpAwesome = {}
+cmpAwesome = {} 
 cmpAwesome.description = "Something, something, darkside"
 cmpAwesome.params = {
-	--Define Parameters and Their Values
-	{"Points", "string", "J1A001 J1B001"},
-	{"Voltage Type (DC/AC)", "string", "DC/AC"},
-	{"DW Voltage (V)", "number", 50},
-	{"DW Current (A)", "number", 0.0015},
-	{"DC Duration (s)", "number", 0.01},
-	{"IR Voltage (V)", "number", 50},
-	{"IR Insulres (ohm)", "number", 5000000},
-	{"Time Good For (s)", "number", 0.002},
-	{"Soak Time (s)", "number", 0.002},
-	{"Soak Until Good (0/1)", "number", 0}
+      --Define Parameters and Their Values
+      {"Points", "string", "J1A001 J1B001"},
+      {"Voltage Type (DC/AC)", "string", "DC"},
+      {"DW Voltage (V)", "number", 50},
+      {"DW Current (A)", "number", 0.0015},
+      {"DC Duration (s)", "number", 0.01},
+      {"IR Voltage (V)", "number", 50},
+      {"IR Insulres (ohm)", "number", 5000000},
+      {"Time Good For (s)", "number", 0.002},
+      {"Soak Time (s)", "number", 0.002},
+      {"Soak Until Good (0/1)", "number", 0},
+      {"Cable Function", "string", ""}
 }
 
-function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
-	--Check for Retest
-	indxfile = io.open('C:\\Cirris\\Index.txt', 'rb')    --Open external index file
-	local indx = tonumber(indxfile:read('*all'))
-	indxfile:close()
-	indxfile = io.open('C:\\Cirris\\Index.txt', 'w')    --Open external index file
-	if indx == 2 then
-		iStart = MessageBox("Retest?", "Why Not!", "Hell No.")
-		if iStart == 2 then
-			indxfile:write("0")
-			indxfile:close()
-			local iHint = DialogOpen("You Can Abort the Test Now.")
-			--Pause for 0.5 Second
-			Delay(.5)
-			DialogClose(iHint)
-			--Pause for 0.5 Second
-			Delay(1)
-			return 0, "Aborted :("
-		else
-			indxfile:write("1")
-			indxfile:close()
-		end
-	else
-		indx = indx + 1
-		indxfile:write(indx)
-		indxfile:close()
-	end	
-	
-	--Indicate the test is starting
-	iTest = DialogOpen("Testing " .. sPoints)
-	Delay(1)
-	DialogClose(iTest)
-	
-	--Display Warning Sign During Initial HV Test
-	local iWarn = DialogOpen("Warning: High Voltage!!!")
-	
-	--Define Local Parameters and Run Initial HV Test
-	local iResult, fResMeasured = HipotNetsTiedToPoints(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)    --Lua Manual Page 102
-		
-	--Define the Rest of the Parameters
-	local i = 1    --Set Index Initial Value
-	local sError    --Set Error Message
-	local sSettings    --Set Setting Message
-	local fV_Max, fV_Min, fV, iR, fM    --Set Parameters for Binary Search
-	
-	sSettings = format("\nSettings:\nDW Voltage: %.2fV\nDW Current %.2fmA\nDW Duration: %.3fs\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\nIR Duration: %.3fs\n", fDWVoltage, fDWCurrent * 1000, fDCDuration, fIRVoltage, fIRInsulRes / 1000000, fTimeGoodFor)
-	
-	if iResult == 1 then
-		sError = format("Error: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.2fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
-	elseif iResult == 2 then
-		sError = "Error: Overcurrent."
-	elseif iResult == 3 then
-		--Set Parameters Initial Values
-		fV_Max = fDWVoltage
-		fV_Min = 50
-		fV = fDWVoltage
-		
-		--Here, the Limit of i is a Preset Value for Minimum Gap Between the Exact Value and the Tested Current Value, 2 ^ 11 = 2048 > 2000
-		while (2 ^ i <= fDWVoltage - 50) do
-			--Conduct HV Test to the Cable in Each Loop
-			iR, fM = HipotNetsTiedToPoints(sPoints, fVoltageType, fV, fDWCurrent, fDCDuration, fV, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
-			if iR == 0 then
-				fV = fV + (fV_Max - fV_Min) / (2 ^ i)    --The Current Value is Larger Than the Exact Value
-			elseif iR == 3 then
-				fV = fV - (fV_Max - fV_Min) / (2 ^ i)    --The Current Value is Smaller Than the Exact Value
-			end
-			i = i + 1
-		end
-		
-		sError = format("Error: Dielectric Failure.\nMaximum Voltage Allowed: %.2fV", fV)
-	elseif iResult ~= 0 then
-		sError = format("Unexpected Error #%i", iResult)
-	end
-	
-	DialogClose(iWarn)
-		
-	--Print the Exact Error
-	if iResult == 0 then
-		--Passed HV Test
-		iRes = DialogOpen("Successful!")
-		Delay(1)
-		DialogClose(iRes)
-		file = io.open('C:\\Cirris\\Report\\Report.txt', 'a')    --Open report file
-		file:write(sPoints .. " Successful!\n" .. os.date() .. sSettings .. "\n\n")
-		file:close()
-		return iResult, sPoints .. " Successful!"
-	else
-		--Failed HV Test
-		iRes = DialogOpen("Failed.\n\n" .. sError)
-		Delay(2)
-		DialogClose(iRes)
-		file = io.open('C:\\Cirris\\Report\\Report.txt', 'a')    --Open report file
-		file:write(sPoints .. " Failed.\n" .. os.date() .. "\n" .. sError .. sSettings .. "\n\n")
-		file:close()
-		return iResult, sPoints .. " Failed. " .. sError
-	end
+function cmpAwesome.test(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood, sFunction)
+      ----Check for Retest
+      --indxfile = io.open('C:\\Cirris\\Index.txt', 'rb')    --Open external index file
+      --local indx = tonumber(indxfile:read('*all'))
+      --indxfile:close()
+      --indxfile = io.open('C:\\Cirris\\Index.txt', 'w')    --Open external index file
+      --if indx == 12 then
+      --    iStart = MessageBox("Retest?", "Why Not!", "Hell No.")
+      --    if iStart == 12 then
+      --          indxfile:write("0")
+      --          indxfile:close()
+      --          local iHint = DialogOpen("You Can Abort the Test Now.")
+      --          --Pause for 0.5 Second
+      --          Delay(.5)
+      --          DialogClose(iHint)
+      --          --Pause for 0.5 Second
+      --          Delay(1)
+      --          return 0, "Aborted :("
+      --    else
+      --          indxfile:write("1")
+      --          indxfile:close()
+      --    end
+      --else
+      --    indx = indx + 1
+      --    indxfile:write(indx)
+      --    indxfile:close()
+      --end 
+      
+      --Indicate the test is starting
+      iTest = DialogOpen("Testing " .. sFunction)
+      Delay(1)
+      DialogClose(iTest)
+      
+      --something
+      
+      --Display Warning Sign During Initial HV Test
+      local iWarn = DialogOpen("Warning: High Voltage!!!")
+      
+      --Define Local Parameters and Run Initial HV Test
+      local iResult, fResMeasured = HipotNetsTiedToPoints(sPoints, fVoltageType, fDWVoltage, fDWCurrent, fDCDuration, fIRVoltage, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)    --Lua Manual Page 102
+            
+      --Define the Rest of the Parameters
+      local i = 1    --Set Index Initial Value
+      local sError    --Set Error Message
+      local sSettings    --Set Setting Message
+      local fV_Max, fV_Min, fV, iR, fM    --Set Parameters for Binary Search
+      
+      sSettings = format("\nSettings:\nDW Voltage: %.2fV\nDW Current %.2fmA\nDW Duration: %.3fs\nIR Voltage: %.2fV\nIR Limit: %.2fMohms\nIR Duration: %.3fs\n", fDWVoltage, fDWCurrent * 1000, fDCDuration, fIRVoltage, fIRInsulRes / 1000000, fTimeGoodFor)
+      
+      if iResult == 1 then
+            sError = format("Error: HV Leakage\nIR Measured: %.2fMohms\nLeakage Current Measured: %.2fmA", fResMeasured / 1000000, fIRVoltage / fResMeasured * 1000)
+      elseif iResult == 2 then
+            sError = "Error: Overcurrent."
+      elseif iResult == 3 then
+            --Set Parameters Initial Values
+            fV_Max = fDWVoltage
+            fV_Min = 50
+            fV = fDWVoltage
+            iR = iResult
+            --Here, the Limit of i is a Preset Value for Minimum Gap Between the Exact Value and the Tested Current Value, 2 ^ 11 = 2048 > 2000
+            while (2 ^ i <= fDWVoltage - 50) do
+                  if iR == 0 then
+                        fV = fV + (fV_Max - fV_Min) / (2 ^ i)    --The Current Value is Larger Than the Exact Value
+                  elseif iR == 3 then
+                        fV = fV - (fV_Max - fV_Min) / (2 ^ i)    --The Current Value is Smaller Than the Exact Value
+                  end
+                  --Conduct HV Test to the Cable in Each Loop
+                  iR, fM = HipotNetsTiedToPoints(sPoints, fVoltageType, fV, fDWCurrent, fDCDuration, fV, fIRInsulRes, fTimeGoodFor, fSoak, iSoakUntilGood)
+                  i = i + 1
+            end
+            
+            sError = format("Error: Dielectric Failure.\nMaximum Voltage Allowed: %.2fV", fV)
+      elseif iResult ~= 0 then
+            sError = format("Unexpected Error #%i", iResult)
+      end
+      
+      DialogClose(iWarn)
+            
+      --Print the Exact Error
+      if iResult == 0 then
+            --Passed HV Test
+            iRes = DialogOpen("Successful!")
+            Delay(1)
+            DialogClose(iRes)
+            file = io.open('C:\\Cirris\\Report\\Report.txt', 'a')    --Open report file
+            file:write(sFunction .. " Successful!\n" .. os.date() .. sSettings .. "\n\n")
+            file:close()
+            return iResult, sFunction .. " Successful!"
+      else
+            --Failed HV Test
+            iRes = DialogOpen("Failed.\n\n" .. sError)
+            Delay(2)
+            DialogClose(iRes)
+            file = io.open('C:\\Cirris\\Report\\Report.txt', 'a')    --Open report file
+            file:write(sFunction .. " Failed.\n" .. os.date() .. "\n" .. sError .. sSettings .. "\n\n")
+            file:close()
+            return iResult, sFunction .. " Failed. " .. sError
+      end
 end
